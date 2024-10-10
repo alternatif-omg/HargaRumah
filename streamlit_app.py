@@ -21,30 +21,34 @@ df = pd.get_dummies(df, columns=['ocean_proximity'], drop_first=True)
 X = df.drop('median_house_value', axis=1)
 y = df['median_house_value']
 
-# Membagi data menjadi set pelatihan dan pengujian
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
 # Model training
-model = RandomForestRegressor(n_estimators=100, random_state=42)
-model.fit(X_train, y_train)
+if 'model' not in st.session_state:
+    # Membagi data menjadi set pelatihan dan pengujian
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Prediksi
-y_pred = model.predict(X_test)
+    # Training the model
+    model = RandomForestRegressor(n_estimators=100, random_state=42)
+    model.fit(X_train, y_train)
 
-# Evaluasi model
-mae = mean_absolute_error(y_test, y_pred)
-rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+    # Save model in session state
+    st.session_state.model = model
+
+    # Prediksi untuk evaluasi
+    st.session_state.y_test = y_test
+    st.session_state.y_pred = model.predict(X_test)
+    st.session_state.mae = mean_absolute_error(y_test, st.session_state.y_pred)
+    st.session_state.rmse = np.sqrt(mean_squared_error(y_test, st.session_state.y_pred))
 
 # Tampilan hasil di Streamlit
 st.title("Prediksi Harga Rumah")
 st.subheader("Hasil Evaluasi Model")
-st.write(f"Mean Absolute Error (MAE): {mae:.2f}")
-st.write(f"Root Mean Squared Error (RMSE): {rmse:.2f}")
+st.write(f"Mean Absolute Error (MAE): {st.session_state.mae:.2f}")
+st.write(f"Root Mean Squared Error (RMSE): {st.session_state.rmse:.2f}")
 
 # Visualisasi perbandingan antara nilai aktual dan prediksi
 st.subheader("Perbandingan Nilai Aktual dan Prediksi")
 fig, ax = plt.subplots()
-sns.scatterplot(x=y_test, y=y_pred, ax=ax)
+sns.scatterplot(x=st.session_state.y_test, y=st.session_state.y_pred, ax=ax)
 ax.set_xlabel("Nilai Aktual")
 ax.set_ylabel("Nilai Prediksi")
 ax.set_title("Perbandingan Harga Rumah Aktual dan Prediksi")
@@ -67,14 +71,14 @@ input_data = {
 ocean_proximity_values = df.filter(like='ocean_proximity_').columns.tolist()
 for ocean in ocean_proximity_values:
     input_data[ocean] = 0  # Default value
-    if ocean_proximity := st.selectbox(f"Ocean Proximity ({ocean})", ["NEAR BAY", "NEAR OCEAN", "ISLAND", "INLAND"]):
-        if ocean_proximity == ocean.split("_")[-1]:  # Check if selected
-            input_data[ocean] = 1  # Set to 1 if selected
+    selected_ocean = st.selectbox(f"Ocean Proximity ({ocean})", ["NEAR BAY", "NEAR OCEAN", "ISLAND", "INLAND"])
+    if selected_ocean == ocean.split("_")[-1]:  # Check if selected
+        input_data[ocean] = 1  # Set to 1 if selected
 
 # Convert input data to DataFrame
 input_df = pd.DataFrame([input_data])
 
-# Melakukan prediksi
+# Melakukan prediksi hanya jika tombol ditekan
 if st.button("Prediksi Harga"):
-    prediction = model.predict(input_df)
+    prediction = st.session_state.model.predict(input_df)
     st.write(f"Harga Prediksi Rumah: ${prediction[0]:,.2f}")
